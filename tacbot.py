@@ -1,5 +1,6 @@
 import pygame
 import math
+import copy
 import random
 
 pygame.init()
@@ -14,6 +15,7 @@ running = True
 
 board = [[-1,-1,-1],[-1,-1,-1],[-1,-1,-1]]
 turn = 0
+mode = "Godmode"
 playerPiece = 0
 
 # Icons
@@ -44,6 +46,13 @@ def drawText(text, pos, size, color):
 def clamp(val, minv, maxv):
     return max(min(val, maxv), minv)
 
+def isDraw(b):
+    for row in range (len(b)):
+        for col in range (len(b[0])):
+            if (b[row][col] == -1):
+                return False
+    return True
+
 def checkWin(b):
     winStates = [
         [[0,0],[0,1],[0,2]],
@@ -57,8 +66,8 @@ def checkWin(b):
     ]
 
     for state in winStates:
-        if (board[state[0][0]][state[0][1]] == board[state[1][0]][state[1][1]]) and (board[state[0][0]][state[0][1]] == board[state[2][0]][state[2][1]]):
-            return board[state[0][0]][state[0][1]]
+        if (b[state[0][0]][state[0][1]] == b[state[1][0]][state[1][1]]) and (b[state[0][0]][state[0][1]] == b[state[2][0]][state[2][1]]):
+            return b[state[0][0]][state[0][1]]
     return -1
 
 def getMouseGrid():
@@ -69,18 +78,18 @@ def getMouseGrid():
 
 
 # Engines
-def randomStrat(pBoard, pTurn): # Picks randomly, pretty self-explanatory
+def randomStrat(pBoard, pTurn):
     attempts = 100
-    while (attempts > 0): # Just gives up if it takes too long
+    while (attempts > 0):
         attempts -= 1
 
         row = random.randint(0,2)
         col = random.randint(0,2)
         if (pBoard[row][col] == -1):
                 return [row, col]
-    linearStrat(pBoard, pTurn)
+    return linearStrat(pBoard, pTurn)
 
-def linearStrat(pBoard, pTurn): # Just selects the first available square
+def linearStrat(pBoard, pTurn):
     for row in range(len(pBoard)):
         for col in range(len(pBoard[0])):
             if (pBoard[row][col] == -1):
@@ -109,22 +118,60 @@ def fillStrat(pBoard, pTurn):
     return randomStrat(pBoard, pTurn)
             
 def godStrat(pBoard, pTurn):
-    pass
+    winStates = [
+        [[0,0],[0,1],[0,2]],
+        [[1,0],[1,1],[1,2]],
+        [[2,0],[2,1],[2,2]],
+        [[0,0],[1,0],[2,0]],
+        [[0,1],[1,1],[2,1]],
+        [[0,2],[1,2],[2,2]],
+        [[0,0],[1,1],[2,2]],
+        [[0,2],[1,1],[2,0]]
+    ]
+
+    for state in winStates:
+        if (pBoard[state[0][0]][state[0][1]] == pBoard[state[1][0]][state[1][1]] and pBoard[state[2][0]][state[2][1]] == -1 and (not pBoard[state[0][0]][state[0][1]] == -1)):
+            return [state[2][0], state[2][1]]
+        if (pBoard[state[1][0]][state[1][1]] == pBoard[state[2][0]][state[2][1]] and pBoard[state[0][0]][state[0][1]] == -1 and (not pBoard[state[1][0]][state[1][1]] == -1)):
+            return [state[0][0], state[0][1]]
+        if (pBoard[state[0][0]][state[0][1]] == pBoard[state[2][0]][state[2][1]] and pBoard[state[1][0]][state[1][1]] == -1 and (not pBoard[state[2][0]][state[2][1]] == -1)):
+            return [state[1][0], state[1][1]]
+    
+    if pBoard[1][1] == -1:
+        return [1, 1]
+    else:
+        return randomStrat(pBoard, pTurn)
+
+def engineMove(mode, pBoard, pTurn):
+    if mode == "Linear":
+        return linearStrat(pBoard, pTurn)
+    if mode == "Random":
+        return randomStrat(pBoard, pTurn)
+    if mode == "Fill":
+        return fillStrat(pBoard, pTurn)
+    if mode == "Godmode":
+        return godStrat(pBoard, pTurn)
 
 # Main loop
+if playerPiece == 1:
+    bestMove = engineMove(mode, board, turn)
+    if (not bestMove == [-1,-1]):
+        board[bestMove[0]][bestMove[1]] = turn
+        turn = int(not bool(turn))
+
 while running:
     for event in pygame.event.get():
         if (event.type == pygame.QUIT):
             running = False
             break
         if (event.type == pygame.MOUSEBUTTONDOWN):
-            if event.button == 1:
+            if event.button == 1: 
                 square = getMouseGrid()
                 if board[square[0]][square[1]] == -1 and (checkWin(board) == -1):
                     board[square[0]][square[1]] = turn
                     turn = int(not bool(turn))
                     if (checkWin(board) == -1):
-                        bestMove = fillStrat(board, turn)
+                        bestMove = engineMove(mode, board, turn)
                         if (not bestMove == [-1,-1]):
                             board[bestMove[0]][bestMove[1]] = turn
                             turn = int(not bool(turn))
@@ -133,6 +180,8 @@ while running:
     drawSprite(boardIcon, boardPos, (cellSize*3, cellSize*3))
     if checkWin(board) == playerPiece:
         drawText("You Win!!", (100,100), 30, "white")
+    if (isDraw(board)):
+        drawText("Tie. I am bored.", (100,100), 30, "white")
     elif checkWin(board) == int(not bool(playerPiece)):
         drawText("You Lose nooo :(", (100,100), 30, "white")
 
